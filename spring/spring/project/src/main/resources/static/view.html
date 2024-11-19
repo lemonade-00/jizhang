@@ -9,15 +9,18 @@
 </head>
 <style>
     @media (max-width: 767.98px) {
+
         /* 小於 md 的螢幕尺寸 */
         .button-grid {
             grid-template-columns: repeat(3, 1fr);
         }
     }
+
     body {
         background-color: #D6C0B3;
         font-family: Arial, sans-serif;
     }
+
     .budget-bar {
         background-color: #D6C0B3;
         border: 2px solid #493628;
@@ -33,6 +36,7 @@
         align-items: center;
         /* 垂直居中 */
     }
+
     .progress {
         flex-grow: 1;
         /* 讓進度條填滿剩餘空間 */
@@ -40,26 +44,31 @@
         /* 讓預算值與邊緣有一點距離 */
         margin-right: 1%;
     }
+
     .progress-bar {
         height: 100%;
         transition: width 0.3s, background-color 0.3s;
         border-radius: 5px;
     }
+
     .budget-value {
         font-size: larger;
         font-weight: bold;
         margin-left: 1%;
     }
+
     #dataTable {
         border-radius: 7px;
         /* 為整個表格設置圓角 */
         overflow: hidden;
         /* 避免內容超出圓角範圍 */
     }
+
     #dataTable th,
     #dataTable td {
         border: 2px solid #493628;
     }
+
     #dataTable td {
         white-space: nowrap;
         /* 防止換行 */
@@ -68,12 +77,15 @@
         text-overflow: ellipsis;
         /* 用省略號表示溢出的內容 */
     }
+
     .date-column {
         width: 20%;
     }
+
     .category-column {
         width: 50%;
     }
+
     .price-column {
         width: 30%;
         text-align: end;
@@ -143,17 +155,17 @@
 
         function fetchData() {
             // 假設 token 儲存在 localStorage 或 sessionStorage 中
-            /*const token = localStorage.getItem('token'); // 或者用 sessionStorage.getItem('token');
+            const token = localStorage.getItem('token'); // 或者用 sessionStorage.getItem('token');
             if (!token) {   // 檢查是否有 token
                 alert('請重新登入');
                 window.location.href = 'login.html';
-            }*/
+            }
             // 發送請求，攜帶 token 作為 Authorization 標頭
             fetch('/Account', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json', // 設置請求的內容類型
-                    //'Authorization': `Bearer ${token}`  // 攜帶 token
+                    'Authorization': `Bearer ${token}`  // 攜帶 token
                 }
             })
                 .then(response => {
@@ -206,21 +218,22 @@
             const currentMonth = now.getMonth();  // 當前月份 (0-11)
             const currentYear = now.getFullYear(); // 當前年份
 
-            // 用 price 的正負來區分收入和支出
+            // 篩選當前月份的支出和收入
             const currentExpenses = data.filter(item => {
                 const date = new Date(item.time);
-                return date.getMonth() === currentMonth && date.getFullYear() === currentYear && item.price < 0; // 支出是負數
+                return date.getMonth() === currentMonth && date.getFullYear() === currentYear && item.price < 0; // 只篩選當月的支出
             });
 
             const currentIncome = data.filter(item => {
                 const date = new Date(item.time);
-                return date.getMonth() === currentMonth && date.getFullYear() === currentYear && item.price > 0; // 收入是正數
+                return date.getMonth() === currentMonth && date.getFullYear() === currentYear && item.price > 0; // 只篩選當月的收入
             });
 
-            const totalExpenses = currentExpenses.reduce((sum, item) => sum + Math.abs(item.price), 0); // 計算支出總額
-            const totalIncome = currentIncome.reduce((sum, item) => sum + item.price, 0); // 計算收入總額
+            // 計算當月的總支出和總收入
+            const totalExpenses = currentExpenses.reduce((sum, item) => sum + Math.abs(item.price), 0); // 計算當月支出
+            const totalIncome = currentIncome.reduce((sum, item) => sum + item.price, 0); // 計算當月收入
 
-            // 更新顯示資訊
+            // 更新當月的顯示
             expenseDisplay.innerText = `支出: $${totalExpenses}`;
             incomeDisplay.innerText = `收入: $${totalIncome}`;
             moneyDisplay.innerText = `當前月份結餘: $${totalIncome - totalExpenses}`;
@@ -230,12 +243,13 @@
 
             dataTable.innerHTML = '';  // 清空表格
 
-            // 合併收入和支出
+            // 顯示所有帳目（包括當月和過去的帳目）
             const allEntries = [
-                ...currentExpenses.map(item => ({ ...item, type: 'expense' })),
-                ...currentIncome.map(item => ({ ...item, type: 'income' }))
+                ...data.filter(item => item.price < 0),  // 所有支出
+                ...data.filter(item => item.price > 0)   // 所有收入
             ];
 
+            // 根據日期分組所有帳目
             const groupedEntries = groupByDate(allEntries);  // 根據日期分組
 
             groupedEntries.forEach(group => {
@@ -377,6 +391,50 @@
         document.getElementById('addAccountButton').addEventListener('click', function () {
             window.location.href = 'form.html';
         });
+
+        // 下載csv
+        document.getElementById('exportButton').addEventListener('click', function () {
+            // 取得所有帶有 data-id 的行
+            const rows = document.querySelectorAll('.clickable-row');
+            const data = [];
+            const seenIds = new Set();  // 用來儲存已經處理過的 ID，避免重複
+
+            rows.forEach(row => {
+                // 取得類別（文字內容）
+                const category = row.textContent.trim();
+
+                // 取得價格（從相同的行中查找價格）
+                const priceCell = row.closest('tr').querySelectorAll('td')[1];
+                const priceText = priceCell.textContent.trim();
+                const price = parseFloat(priceText.replace('$', ''));
+
+                // 確認 data-id 屬性
+                const id = row.getAttribute('data-id');
+                
+                // 如果這個 ID 還沒被處理過，就加入資料
+                if (!seenIds.has(id)) {
+                    seenIds.add(id);  // 標記這個 ID 已經處理過
+                    data.push({ id, category, price});
+                }
+            });
+
+            // 將資料轉換為 CSV 格式
+            const csvContent = [
+                // 加入 CSV 標題行
+                ['ID', '類別', '價格'],
+                ...data.map(row => [row.id, row.category, row.price])
+            ]
+            .map(row => row.join(','))
+            .join('\n');
+
+            // 在 CSV 開頭加入 BOM 以確保 Excel 正確識別 UTF-8 編碼
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'example.csv';
+            link.click();
+        });
+
     </script>
 </body>
 

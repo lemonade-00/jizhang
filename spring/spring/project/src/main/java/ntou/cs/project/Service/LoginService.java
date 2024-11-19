@@ -3,14 +3,12 @@ package ntou.cs.project.Service;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.Collections;
-
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
-import ntou.cs.project.Common.*;
 import ntou.cs.project.repository.*;
+import ntou.cs.project.Common.*;
 
 @Service
 public class LoginService implements UserDetailsService {
@@ -27,10 +25,7 @@ public class LoginService implements UserDetailsService {
             throw new UsernameNotFoundException("User not found");
         }
 
-        return new org.springframework.security.core.userdetails.User(
-                dbUser.getEmail(),
-                dbUser.getPassword(),
-                Collections.emptyList());
+        return new CustomUserDetails(dbUser);
     }
 
 }

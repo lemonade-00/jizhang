@@ -21,12 +21,13 @@ public class MyService {
 	@Autowired
 	private AccountRepository repository;
 
-	public Account createAccount(AccountRequest request, String filePath) {
+	public Account createAccount(AccountRequest request, String filePath, String userID) {
 		Account accounts = new Account();
 		accounts.setRemark(request.getRemark());
 		accounts.setCategory(request.getCategory());
 		accounts.setAttach(filePath);
 		accounts.setPrice(request.getPrice());
+		accounts.setUserID(userID);
 
 		DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 		LocalDateTime time = LocalDateTime.parse(request.getTime(), formatter);
@@ -50,7 +51,7 @@ public class MyService {
 		repository.deleteById(id);
 	}
 
-	public ArrayList<Account> getAccounts(QueryParameter param) {
+	public ArrayList<Account> getAccounts(QueryParameter param, String userID) {
 		String category = param.getCategory(); // 類別
 		String startTime = param.getStartTime(); // 起始時間
 		String endTime = param.getEndTime(); // 結束時間

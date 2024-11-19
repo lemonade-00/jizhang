@@ -229,8 +229,17 @@
             formData.append('data', JSON.stringify(data)); // 將數據轉換為 JSON 字符串
             formData.append('attach', attach); // 添加附件到表單數據
 
+            const token = localStorage.getItem('token'); // 或者用 sessionStorage.getItem('token');
+            if (!token) {   // 檢查是否有 token
+                alert('請重新登入');
+                window.location.href = 'index.html';
+            }
+
             fetch('Account/addAccount', {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`  // 攜帶 token
+                },
                 body: formData,
             })
                 .then(response => response.json())

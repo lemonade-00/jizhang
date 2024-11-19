@@ -117,8 +117,12 @@
 			})
 				.then(response => response.json())
 				.then(data => {
-					alert('註冊成功(前端)');
-					window.location.href = 'index.html';
+					if (data.status) {
+						alert('註冊成功');
+						window.location.href = 'index.html';
+					} else {
+						alert(data.message || '登入失敗');
+					}
 				})
 				.catch((error) => {
 					console.error('錯誤:', error);

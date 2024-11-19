@@ -27,8 +27,6 @@ public class MemberService {
 
         newUser.setEmail(request.getEmail());
         newUser.setPassword(passwordEncoder.encode(request.getPassword()));
-        System.out.println(newUser.getEmail());
-        System.out.println(newUser.getPassword());
         // 將新用戶加入資料庫
         userRepository.insert(newUser);
     }

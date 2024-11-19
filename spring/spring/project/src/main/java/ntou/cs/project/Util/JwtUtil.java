@@ -42,6 +42,11 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
+    public String getIDFromToken(String token, String claimKey) {
+        final Claims claims = parseToken(token);
+        return claims.get(claimKey, String.class);
+    }
+
     private Claims parseToken(String token) {
         return Jwts.parserBuilder().setSigningKey(secretKey).build().parseClaimsJws(token).getBody();
     }
