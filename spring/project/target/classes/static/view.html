@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首頁</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<style>
+    @media (max-width: 767.98px) {
+
+        /* 小於 md 的螢幕尺寸 */
+        .button-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    body {
+        background-color: #D6C0B3;
+        font-family: Arial, sans-serif;
+    }
+
+    .budget-bar {
+        background-color: #D6C0B3;
+        border: 2px solid #493628;
+        padding: 10px;
+        text-align: center;
+        margin-bottom: 20px;
+        position: relative;
+        cursor: pointer;
+        /* 使其可點擊 */
+        display: flex;
+        justify-content: space-between;
+        /* 左右對齊 */
+        align-items: center;
+        /* 垂直居中 */
+    }
+
+    .progress {
+        flex-grow: 1;
+        /* 讓進度條填滿剩餘空間 */
+        margin-left: 1%;
+        /* 讓預算值與邊緣有一點距離 */
+        margin-right: 1%;
+    }
+
+    .progress-bar {
+        height: 100%;
+        transition: width 0.3s, background-color 0.3s;
+        border-radius: 5px;
+    }
+
+    .budget-value {
+        font-size: larger;
+        font-weight: bold;
+        margin-left: 1%;
+    }
+
+    #dataTable {
+        border-radius: 7px;
+        /* 為整個表格設置圓角 */
+        overflow: hidden;
+        /* 避免內容超出圓角範圍 */
+    }
+
+    #dataTable th,
+    #dataTable td {
+        border: 2px solid #493628;
+    }
+
+    #dataTable td {
+        white-space: nowrap;
+        /* 防止換行 */
+        overflow: hidden;
+        /* 隱藏溢出的內容 */
+        text-overflow: ellipsis;
+        /* 用省略號表示溢出的內容 */
+    }
+
+    .date-column {
+        width: 20%;
+    }
+
+    .category-column {
+        width: 50%;
+    }
+
+    .price-column {
+        width: 30%;
+        text-align: end;
+        /* 右對齊價格 */
+    }
+</style>
+
+<body>
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="budget-bar" id="budgetBar">
+                    本月預算: <span class="budget-value" id="budgetDisplay">未設定</span>
+                    <div class="progress mt-2">
+                        <div id="budgetProgressBar" class="progress-bar" role="progressbar" style="width: 0;"></div>
+                    </div>剩餘預算: <span class="budget-value" id="remainingDisplay">未設定</span>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <p class="mb-1" id="moneyDisplay" style="font-size: larger;">當前月份結餘:</p>
+                            <p class="mb-1" id="expenseDisplay">支出:</p>
+                            <p class="mb-1" id="incomeDisplay">收入:</p>
+                        </div>
+                    </div>
+                    <table class="table table-bordered" id="dataTable">
+                        <tbody>
+                            <!-- 表格未來會在這裡 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="d-grid gap-3 justify-content-center button-grid">
+                    <button class="btn" style="background-color: #493628; color: white;"
+                        id="showChartButton">顯示圖表</button>
+                    <button class="btn" style="background-color: #493628; color: white;"
+                        id="addAccountButton">新增帳目</button>
+                    <button class="btn" style="background-color: #493628; color: white;" id="exportButton">匯出</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <script>
+        let budget = null;  //初始化預算
+
+        //在網頁加載時獲取帳戶的所有帳目
+        window.onload = function () {
+            //localStorage.removeItem('budget');
+            fetchData();    //初始載入所有數據
+            loadBudget();   //載入已儲存的預算
+            updateBudgetDisplay(); // 更新預算顯示
+        };
+
+        //獲取資料的函數
+        /*function fetchData() {
+            fetch(`https://raw.githubusercontent.com/YRaynott/Software-Engineering/main/test.json`) // 替換為你的 API 端點
+                .then(response => response.json())
+                .then(data => {
+                    const allData = []; //假設每個帳目包含'account'和'recurringAccount'
+                    data.forEach(item => {  //如果有'account'和'recurringAccount'，將它們合併到allData
+                        if (item.account) {
+                            const accountData = { ...item.account };  // 直接push'account'內的資料
+                            if (item.recurringAccount) {
+                                accountData.active = item.recurringAccount.active;
+                                accountData.recurrenceType = item.recurringAccount.recurrenceType;
+                                accountData.recurrenceEndDate = item.recurringAccount.recurrenceEndDate;
+                            }
+                            allData.push(accountData);
+                        }
+                    });
+                    updateDisplay(allData);
+                })
+                .catch(error => {
+                    console.error('錯誤:', error);
+                    alert('獲取數據時發生錯誤');
+                });
+        }*/
+
+        function fetchData() {
+            // 假設 token 儲存在 localStorage 或 sessionStorage 中
+            const token = localStorage.getItem('token'); // 或者用 sessionStorage.getItem('token');
+            if (!token) {   // 檢查是否有 token
+                alert('沒有找到有效的身份驗證 token');
+                return;
+            }
+
+            // 發送請求，攜帶 token 作為 Authorization 標頭
+            fetch('/Account', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json', // 設置請求的內容類型
+                    'Authorization': `Bearer ${token}`  // 攜帶 token
+                }
+            })
+                .then(response => {
+                    if (!response.ok) { // 檢查響應是否成功
+                        throw new Error(`API 請求失敗，錯誤代碼: ${response.status}`);
+                    }
+                    return response.json(); // 解析返回的 JSON
+                })
+                .then(data => {
+                    console.log(data)
+                    const allData = [];
+                    data.forEach(item => {  //如果有'account'和'recurringAccount'，將它們合併到allData
+                        if (item.account) {
+                            const accountData = { ...item.account };  // 直接push'account'內的資料
+                            if (item.recurringAccount) {
+                                accountData.active = item.recurringAccount.active;
+                                accountData.recurrenceType = item.recurringAccount.recurrenceType;
+                                accountData.recurrenceEndDate = item.recurringAccount.recurrenceEndDate;
+                            }
+                            allData.push(accountData);
+                        }
+                    });
+                    updateDisplay(allData);    // 更新顯示的資料
+                })
+                .catch(error => {
+                    console.error('錯誤:', error);
+                    alert('獲取數據時發生錯誤');
+                });
+        }
+
+        //根據日期分組的函數
+        function groupByDate(entries) {
+            const groups = {};
+
+            entries.forEach(entry => {
+                const date = new Date(entry.time);
+                const dateKey = date.toISOString().split('T')[0];  // yyyy-mm-dd 格式
+
+                if (!groups[dateKey]) {
+                    groups[dateKey] = [];
+                }
+                groups[dateKey].push(entry);
+            });
+
+            return Object.keys(groups).sort((a, b) => new Date(b) - new Date(a)).map(date => {
+                return {
+                    date,
+                    entries: groups[date].sort((a, b) => new Date(b.time) - new Date(a.time))
+                };
+            });
+        }
+
+        //更新顯示的數據
+        function updateDisplay(data) {
+            const expenseDisplay = document.getElementById('expenseDisplay');
+            const incomeDisplay = document.getElementById('incomeDisplay');
+            const moneyDisplay = document.getElementById('moneyDisplay');
+            const dataTable = document.getElementById('dataTable').querySelector('tbody');
+
+            const now = new Date();
+            const currentMonth = now.getMonth();    //當前月份 (0-11)
+            const currentYear = now.getFullYear();  //當前年份
+
+            //篩選當前月份的支出和收入
+            const currentExpenses = data.filter(item => {
+                const date = new Date(item.time);
+                return date.getMonth() === currentMonth && date.getFullYear() === currentYear && item.price < 0;    //只篩選當月的支出
+            });
+            const currentIncome = data.filter(item => {
+                const date = new Date(item.time);
+                return date.getMonth() === currentMonth && date.getFullYear() === currentYear && item.price > 0;    //只篩選當月的收入
+            });
+            //計算當月的總支出和總收入
+            const totalExpenses = currentExpenses.reduce((sum, item) => sum + Math.abs(item.price), 0); //計算當月支出
+            const totalIncome = currentIncome.reduce((sum, item) => sum + item.price, 0);
+
+            //更新當月的顯示
+            expenseDisplay.innerText = `支出: $${totalExpenses}`;
+            incomeDisplay.innerText = `收入: $${totalIncome}`;
+            moneyDisplay.innerText = `當前月份結餘: $${totalIncome - totalExpenses}`;
+
+            //更新預算顯示
+            updateBudgetDisplay(totalExpenses);
+
+            dataTable.innerHTML = '';  // 清空表格
+
+            //顯示所有帳目（包括當月和過去的帳目）
+            const allEntries = [
+                ...data.filter(item => item.price < 0),  // 所有支出
+                ...data.filter(item => item.price > 0)   // 所有收入
+            ];
+
+            //根據日期分組所有帳目
+            const groupedEntries = groupByDate(allEntries); //根據日期分組
+
+            groupedEntries.forEach(group => {
+                //顯示日期和總支出、收入
+                const dateRow = document.createElement('tr');
+                dateRow.classList.add('table-secondary');
+                let totalExpense = 0;
+                let totalIncome = 0;
+
+                group.entries.forEach(item => {
+                    if (item.price < 0) {   //價格為負數表示支出
+                        totalExpense += Math.abs(item.price);   //累加支出金額（取絕對值）
+                    } else if (item.price > 0) {
+                        totalIncome += item.price;
+                    }
+                });
+
+                let totalExpenseContent = totalExpense > 0 ? `總支出: $${totalExpense}` : '';
+                let totalIncomeContent = totalIncome > 0 ? `總收入: $${totalIncome}` : '';
+
+                dateRow.innerHTML = `<td style="width: 50%; background-color: #AB886D" class="text-start"><strong>${group.date}</strong></td>
+                                    <td style="background-color: #AB886D; text-align: center;">重複性</td>
+                                    <td class="text-end" style="width: 50%; background-color: #AB886D">${totalExpenseContent} ${totalIncomeContent}</td>
+                                    <td style="background-color: #AB886D"></td>`;
+                dataTable.appendChild(dateRow);
+
+                //顯示當天的每筆支出和收入
+                group.entries.forEach(item => {
+                    const remark = item.remark ? ` <span style="color: #9400d3; text-align:right; float:right;"> ${item.remark}</span>` : ''; //9400d3, 9F6A4A
+                    let recurrenceInfo = `<span class="bi bi-x-circle-fill"></span>`;  // 用來顯示週期性信息的變數
+                    if (item.recurrenceType) {
+                        const recurrenceType = item.recurrenceType;
+                        if (recurrenceType === 'daily') {
+                            recurrenceInfo = `<span>每日</span>`;
+                        } else if (recurrenceType === 'monthly') {
+                            recurrenceInfo = `<span>每月</span>`;
+                        } else if (recurrenceType === 'weekly') {
+                            recurrenceInfo = `<span>每週</span>`;
+                        }
+                    }
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="clickable-row" data-id="${item.id}" style="width:70%; text-align:left;">
+                            <i class="bi bi-${getIcon(item.category)}"></i> ${item.category}${remark}</td>
+                        <td class="text-center">${recurrenceInfo}</td>
+                        <td class="text-end clickable-row" data-id="${item.id}" style="width:30%;">$${Math.abs(item.price)}</td>
+                        <td class="bi bi-trash-fill clickable-trash"  data-id="${item.id}"></td>`;
+                    dataTable.appendChild(row);
+                });
+                //點擊事件(編輯)
+                document.querySelectorAll('.clickable-row').forEach(row => {
+                    row.addEventListener('click', function () {
+                        const id = this.dataset.id;
+                        const selectedAccount = data.find(account => Number(account.id) === Number(id));
+                        sessionStorage.setItem('selectedAccount', JSON.stringify(selectedAccount));
+                        window.location.href = `edit.html?id=${id}`;
+                    });
+                });
+            });
+
+            //垃圾桶圖標的點擊事件委託給表格的父元素
+            dataTable.addEventListener('click', function (event) {
+                const target = event.target;
+                if (target && target.classList.contains('clickable-trash')) {
+                    const id = target.dataset.id;
+                    if (confirm('確定要刪除這筆資料嗎？')) {
+                        deleteData(id);
+                    }
+                }
+            });
+        }
+
+        //刪除資料
+        function deleteData(id) {
+            fetch(`/Account/${id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    //如果有 token，這裡也可以加上 Authorization 標頭
+                    //'Authorization': `Bearer ${token}`
+                }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('刪除資料失敗');
+                    }
+                    alert('資料已成功刪除');
+                    fetchData();    //刷新資料
+                })
+                .catch(error => {
+                    console.error('錯誤:', error);
+                    alert('刪除資料時發生錯誤');
+                });
+        }
+
+        //載入預算
+        function loadBudget() {
+            const storedBudget = localStorage.getItem('budget');
+            if (storedBudget !== null) {
+                budget = parseFloat(storedBudget);  //轉換為數字並賦值給預算
+            } else {
+                budget = null;
+            }
+        }
+
+        function updateBudgetDisplay(totalExpenses = 0) {
+            const budgetDisplay = document.getElementById('budgetDisplay');
+            const remainingDisplay = document.getElementById('remainingDisplay');
+            const budgetProgressBar = document.getElementById('budgetProgressBar');
+
+            if (budget === null) {
+                budgetDisplay.innerText = '未設定';
+                remainingDisplay.innerText = '未設定';
+                budgetProgressBar.style.width = '0%';
+                budgetProgressBar.style.backgroundColor = '#E4E0E1'; // 預算未設定的顏色
+            } else {
+                const remaining = budget - totalExpenses; // 餘額
+                budgetDisplay.innerText = `$${budget}`; // 顯示設定的預算
+                remainingDisplay.innerText = `$${remaining < 0 ? 0 : remaining}`; // 顯示剩餘預算
+
+                // 計算預算條的長度
+                let usedPercentage = (totalExpenses / budget) * 100;
+
+                // 確保不會超過100%
+                usedPercentage = Math.min(usedPercentage, 100);
+
+                // 設定進度條的寬度和顏色
+                budgetProgressBar.style.width = `${usedPercentage}%`;
+
+                // 根據剩餘預算改變顏色
+                if (totalExpenses === 0) {
+                    budgetProgressBar.style.backgroundColor = '#28a745'; // 沒有支出時顏色為綠色
+                } else {
+                    budgetProgressBar.style.backgroundColor = remaining > 0 ? '#28a745' : '#dc3545'; // 根據餘額顏色變化
+                }
+            }
+        }
+
+        //點擊預算條設定預算
+        document.getElementById('budgetBar').addEventListener('click', function () {
+            const userInput = prompt("請設定您的預算:", budget !== null ? budget : "");
+            if (userInput !== null) {
+                const newBudget = parseFloat(userInput);
+                if (!isNaN(newBudget) && newBudget >= 0) {
+                    budget = newBudget; //設定新的預算
+                    const totalExpenses = Number(expenseDisplay.innerText.replace(/[^0-9]/g, ''));  //提取當前支出
+                    localStorage.setItem('budget', newBudget);  //載入先前的預算(如果有的話)
+                    updateBudgetDisplay(totalExpenses); //更新顯示
+                } else {
+                    alert("請輸入有效的預算數字！");
+                }
+            }
+        });
+
+        //根據類別回傳對應的Bootstrap icon名稱
+        function getIcon(category) {
+            switch (category) {
+                case '餐飲':
+                    return 'cup-fill';
+                case '服裝':
+                    return 'shop';
+                case '交通':
+                    return 'car-front-fill';
+                case '娛樂':
+                    return 'controller';
+                case '教育':
+                    return 'mortarboard-fill';
+                case '運動':
+                    return 'bicycle';
+                case '生活':
+                    return 'receipt';
+                case '美容':
+                    return 'scissors';
+                case '房租':
+                    return 'house-check-fill';
+                case '稅':
+                    return 'file-earmark-text';
+                case '保險':
+                    return 'sheild-fill-check';
+                case '醫療':
+                    return 'hospital';
+                case '水電費':
+                    return 'plug-fill'
+                case '通訊':
+                    return 'telephone';
+                case '其他(-)':
+                    return 'sign-intersection-fill';
+                case '薪水':
+                    return 'briefcase-fill';
+                case '投資':
+                    return 'graph-up-arrow';
+                case '兼職':
+                    return 'clock-fill';
+                case '其他(+)':
+                    return 'sign-intersection';
+                default:
+                    return 'question-circle'; // 默認圖標
+            }
+        }
+
+        //跳轉到新增帳目頁面
+        document.getElementById('addAccountButton').addEventListener('click', function () {
+            window.location.href = 'form.html';
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修改帳目</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<style>
+    body {
+        background-color: #D6C0B3;
+        font-family: Arial, sans-serif;
+    }
+
+    .modal {
+        display: none;
+        /* 隱藏視窗 */
+        position: fixed;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        background-color: #493628;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background-color: #E4E0E1;
+        padding: 2%;
+        border-radius: 5px;
+        overflow-y: auto;
+        /*允許垂直滾動*/
+    }
+
+    fieldset {
+        position: relative;
+        border: 3px solid #493628;
+        padding: 2%;
+        margin-bottom: 15px;
+    }
+
+    legend {
+        position: absolute;
+        top: -15px;
+        left: 10px;
+        padding: 0 5px;
+        width: 5%;
+        background-color: #E4E0E1;
+        /*背景設為白色以覆蓋邊框*/
+    }
+
+    .icon {
+        cursor: pointer;
+        margin: 10px;
+        display: inline-block;
+        text-align: center;
+        font-size: 20px;
+    }
+
+    .selected-icon {
+        font-size: 50px;
+        margin: 20px 0;
+        cursor: pointer;
+        /*讓選擇的圖標可以點擊*/
+    }
+
+    #categoryModal .modal-content {
+        max-height: 80%;
+        /*使modal高度能適應大螢幕與小螢幕*/
+        overflow-y: auto;
+    }
+
+    #attachmentContainer {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        /*圖片和檔案名稱之間的間距*/
+    }
+
+    #attachmentContainer img,
+    #attachmentContainer video {
+        max-width: 200px;
+        /*限制預覽大小*/
+    }
+
+    #attachmentContainer div {
+        max-width: 200px;
+        /*限制檔案名稱的最大寬度*/
+    }
+
+    @media (max-width: 768px) {
+
+        /*手機或平板裝置的樣式*/
+        #all {
+            display: flex;
+            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-label.form-control {
+            font-size: 14px;
+        }
+
+        .modal-content {
+            width: 95%;
+        }
+
+        .icon {
+            width: 25%;
+            /* 使圖示縮小以適應小螢幕 */
+            margin: 5px;
+        }
+
+        #submit {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+        }
+    }
+</style>
+
+<body>
+    <div class="container mt-5">
+        <form id="accountForm">
+            <div class="mb-3 d-flex align-items-center justify-content-between" id="all"
+                style="gap: 15px; flex-wrap: nowrap;">
+                <div class="d-flex align-items-center">
+                    <input type="hidden" id="selectedCategory">
+                    <div id="selectedIcon" class="selected-icon" onclick="showModal()">
+                        <!--獲取id的icon-->
+                    </div>
+                </div>
+                <div class="d-flex align-items-center">
+                    <label for="price" class="form-label me-2">價格:</label>
+                    <input type="number" class="form-control" id="price" style="width: auto;" required>
+                </div>
+                <div class="form-check d-flex align-items-center">
+                    <input type="checkbox" class="form-check-input" id="isRecurring"
+                        onchange="toggleRecurringOptions()">
+                    <label class="form-check-label" for="isRecurring">&nbsp;&nbsp;重複性帳目</label>
+                </div>
+                <!--當選擇帳目為重複性帳目時，顯示週期與截止日期的選項-->
+                <div id="recurringOptions"
+                    style="max-height: 0; overflow: hidden; visibility: hidden; opacity: 0; transition: max-height 0.3s ease-out, opacity 0.3s ease-out;">
+                    <div class="d-flex" style="gap: 20px;">
+                        <div class="d-flex align-items-center" style="flex: 1;">
+                            <label for="recurrenceType" class="form-label"
+                                style="min-width: 90px; white-space: nowrap;">重複週期:</label>
+                            <select class="form-select" id="recurrenceType">
+                                <option value="daily">每日</option>
+                                <option value="weekly">每週</option>
+                                <option value="monthly">每月</option>
+                                <option value="yearly">每年</option>
+                            </select>
+                        </div>
+                        <div class="d-flex align-items-center" style="flex: 1;">
+                            <label for="recurrenceEndDate" class="form-label"
+                                style="min-width: 120px; white-space: nowrap;">重複截止日期:</label>
+                            <input type="date" class="form-control" id="recurrenceEndDate">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="categoryModal" class="modal" onclick="closeModal(event)">
+                <div class="modal-content" onclick="event.stopPropagation()">
+                    <h2>選擇類別</h2>
+                    <fieldset> <!--支出-->
+                        <legend>支出</legend>
+                        <div class="icon" data-type="expense" onclick="selectCategory('餐飲', 'bi-cup-fill')">
+                            <i class="bi bi-cup-fill"></i><br>餐飲
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('服裝', 'bi-shop')">
+                            <i class="bi bi-shop"></i><br>服裝
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('交通', 'bi-car-front-fill')">
+                            <i class="bi bi-car-front-fill"></i><br>交通
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('娛樂', 'bi-controller')">
+                            <i class="bi bi-controller"></i><br>娛樂
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('教育', 'bi-mortarboard-fill')">
+                            <i class="bi bi-mortarboard-fill"></i><br>教育
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('運動', 'bi-bicycle')">
+                            <i class="bi bi-bicycle"></i><br>運動
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('生活', 'bi-receipt')">
+                            <i class="bi bi-receipt"></i><br>生活
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('美容', 'bi-scissors')">
+                            <i class="bi bi-scissors"></i><br>美容
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('房租', 'bi-house-check-fill')">
+                            <i class="bi bi-house-check-fill"></i><br>房租
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('稅', 'bi-file-earmark-text')">
+                            <i class="bi bi-file-earmark-text"></i><br>稅
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('保險', 'bi-shield-fill-check')">
+                            <i class="bi bi-shield-fill-check"></i><br>保險
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('醫療', 'bi-hospital')">
+                            <i class="bi bi-hospital"></i><br>醫療
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('水電費', 'bi-plug-fill')">
+                            <i class="bi bi-plug-fill"></i><br>水電費
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('通訊', 'bi-telephone')">
+                            <i class="bi bi-telephone"></i><br>通訊
+                        </div>
+                        <div class="icon" data-type="expense"
+                            onclick="selectCategory('其他(-)', 'bi-sign-intersection-fill')">
+                            <i class="bi bi-sign-intersection-fill"></i><br>其他(-)
+                        </div>
+                        <div class="icon" data-type="expense" onclick="selectCategory('自定義', 'bi-pencil-square')">
+                            <i class="bi bi-pencil-square"></i><br>自定義
+                        </div>
+                    </fieldset><br>
+                    <fieldset> <!--收入-->
+                        <legend>收入</legend>
+                        <div class="icon" data-type="income" onclick="selectCategory('薪水', 'bi-briefcase-fill')">
+                            <i class="bi bi-briefcase-fill"></i><br>薪水
+                        </div>
+                        <div class="icon" data-type="income" onclick="selectCategory('投資', 'bi-graph-up-arrow')">
+                            <i class="bi bi-graph-up-arrow"></i><br>投資
+                        </div>
+                        <div class="icon" data-type="income" onclick="selectCategory('兼職', 'bi-clock-fill')">
+                            <i class="bi bi-clock-fill"></i><br>兼職
+                        </div>
+                        <div class="icon" data-type="income" onclick="selectCategory('其他(+)', 'bi-sign-intersection')">
+                            <i class="bi bi-sign-intersection"></i><br>其他(+)
+                        </div>
+                        <div class="icon" data-type="income" onclick="selectCategory('自定義', 'bi-pencil-square')">
+                            <i class="bi bi-pencil-square"></i><br>自定義
+                        </div>
+                    </fieldset><br>
+                    <div id="customCategoryInput" style="display:none;">
+                        <label for="customCategoryName">自定義類別名稱:</label>
+                        <input type="text" id="customCategoryName" class="form-control" placeholder="輸入類別名稱"><br>
+                        <button class="btn" style="background-color: #493628; color: white;"
+                            onclick="confirmCustomCategory()">確定</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="time" class="form-label">日期時間:</label>
+                <input type="datetime-local" class="form-control" id="time" required>
+            </div>
+            <div class="mb-3">
+                <label for="remark" class="form-label">備註:</label>
+                <input type="text" class="form-control" id="remark">
+            </div>
+            <div class="mb-3">
+                <label for="attach" class="form-label">附件:</label>
+                <input type="file" class="form-control" id="attach" accept="image/*,video/*">
+                <!-- 用來顯示附件的地方 -->
+                <div id="attachmentContainer"></div>
+            </div>
+            <button type="submit" class="btn" style="background-color: #493628; color: white;" id="submit">修改</button>
+        </form>
+    </div>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <script>
+        const modal = document.getElementById('categoryModal');
+        const selectedIconDiv = document.getElementById('selectedIcon');
+        const selectedCategoryInput = document.getElementById('selectedCategory');
+
+        window.onload = function () {
+            fetchSingleData();    //初始載入所有數據
+        };
+
+        function fetchSingleData() {
+            const selectedAccount = JSON.parse(sessionStorage.getItem('selectedAccount'));
+            //console.log(selectedAccount);
+            updateDisplay(selectedAccount); // 顯示篩選出的資料
+            /*const id = 8;
+            if (!id) {
+                alert('無效的 ID');
+                return;
+            }
+            fetch(`https://raw.githubusercontent.com/YRaynott/Software-Engineering/main/test.json`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`API 請求失敗，錯誤代碼: ${response.status}`);
+                    }
+                    return response.json(); // 將 JSON 響應解析為 JavaScript 數據
+                })
+                .then(data => {
+                    // 根據 id 篩選資料
+                    const record = data.find(item => String(item.account.id) === String(id));
+                    if (!record) {
+                        alert('未找到對應的資料');
+                        return;
+                    }
+                    const accountData = { ...record.account };  // 複製 account 資料
+                    if (record.recurringAccount) {
+                        accountData.active = record.recurringAccount.active;
+                        accountData.recurrenceType = record.recurringAccount.recurrenceType;
+                        accountData.recurrenceEndDate = record.recurringAccount.recurrenceEndDate;
+                    }
+                    updateDisplay(accountData); // 顯示篩選出的資料
+                    //console.log(accountData);
+                })
+                .catch(error => {
+                    console.error('錯誤:', error);
+                    alert('獲取數據時發生錯誤');
+                });*/
+        }
+        /*function fetchSingleData() {
+            const queryString = window.location.search;
+            const urlParams = new URLSearchParams(queryString); //創建URLSearchParams物件
+            const id = urlParams.get('id'); //取得參數 id 的值
+            console.log(id);
+            if (!id) {
+                alert('無效的 ID');
+                return;
+            }
+            //發送請求，攜帶id
+            fetch(`/Account/${id}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`API 請求失敗，錯誤代碼: ${response.status}`);
+                    }
+                    return response.json(); // 解析 JSON 響應
+                })
+                .then(data => {
+                    if (!data) {
+                        alert('未找到資料');
+                        return;
+                    }
+                    // 顯示篩選出的資料
+                    updateDisplay(data);
+                })
+                .catch(error => {
+                    console.error('錯誤:', error);
+                    alert('獲取數據時發生錯誤');
+                });
+        }*/
+
+        function updateDisplay(data) {
+            //將獲取到的單筆資料顯示到頁面上
+            document.getElementById('price').value = data.price;
+            document.getElementById('time').value = data.time;
+            document.getElementById('remark').value = data.remark;
+
+            //根據資料中的類別設置圖標
+            const category = data.category;
+            const iconClass = getIcon(category);  // 獲取對應的圖標
+            const selectedIconDiv = document.getElementById('selectedIcon');
+            selectedIconDiv.innerHTML = `<i class="bi bi-${iconClass}"></i>`; // 更新圖標
+            const selectedType = data.type
+            document.getElementById('selectedCategory').value = category;   // 將類別填入隱藏的 input 元素中
+
+            //重複性處理
+            if (data.active) {
+                document.getElementById('isRecurring').checked = data.active;
+                toggleRecurringOptions();
+                document.getElementById('recurrenceType').value = data.recurrenceType;
+                document.getElementById('recurrenceEndDate').value = data.recurrenceEndDate;
+            }
+            //附件處理
+            if (data.attach) {
+
+                const attach = data.attach;
+                const attachURL = data.attachURL;
+                const fileExtension = attach.split('.').pop().toLowerCase();  // 取得檔案副檔名
+                const container = document.getElementById("attachmentContainer");
+
+                if (fileExtension === "jpg" || fileExtension === "jpeg" || fileExtension === "png" || fileExtension === "gif") {
+                    // 顯示圖片
+                    const img = document.createElement("img");
+                    img.src = attachURL;
+                    img.alt = attach;
+                    img.style.maxWidth = "100%";
+                    container.appendChild(img);
+                } else if (fileExtension === "mp4" || fileExtension === "avi" || fileExtension === "mov") {
+                    // 顯示影片
+                    const video = document.createElement("video");
+                    video.controls = true;
+                    const source = document.createElement("source");
+                    source.src = attachURL;
+                    source.type = "video/mp4";  // 根據實際格式設置type
+                    video.appendChild(source);
+                    container.appendChild(video);
+                }
+                const fileNameElement = document.createElement("div");
+                fileNameElement.textContent = attach;
+                container.appendChild(fileNameElement);
+            }
+        }
+
+        //顯示選擇類別的視窗
+        function showModal() {
+            const modal = document.getElementById('categoryModal');
+            modal.style.display = 'flex';
+        }
+
+        let isCustomCategory = false;   //記錄是否選擇了自定義類別
+        //選擇類別的函數
+        function selectCategory(category, iconClass) {
+            if (category === '自定義') {
+                //顯示自定義類別的輸入框
+                document.getElementById('customCategoryInput').style.display = 'block';
+                isCustomCategory = true;
+                return; //不更新icon，讓使用者輸入自定義類別名稱
+            }
+
+            selectedIconDiv.innerHTML = `<i class="bi ${iconClass}"></i>`;  //更新顯示的圖標
+            selectedCategoryInput.value = category;
+            selectedType = event.currentTarget.getAttribute('data-type');
+            modal.style.display = 'none'; // 自動關閉視窗
+        }
+
+        //確認自定義類別的輸入
+        function confirmCustomCategory() {
+            const customCategoryName = document.getElementById('customCategoryName').value;
+            if (!customCategoryName) {
+                alert("請輸入自定義類別名稱！");
+                return;
+            }
+            //更新選擇的類別和icon
+            selectedCategoryInput.value = customCategoryName;
+            selectedIconDiv.innerHTML = `<i class="bi bi-pencil-square"></i>`;  //顯示預設鋼筆圖標
+            modal.style.display = 'none';   //關閉選擇類別視窗
+        }
+
+        function closeModal(event) {
+            if (event.target === document.getElementById('categoryModal')) {   //只在背景被點擊時關閉
+                const modal = document.getElementById('categoryModal');
+                modal.style.display = 'none';
+            }
+        }
+
+        //切換重複性帳目選項的顯示狀態
+        function toggleRecurringOptions() {
+            var recurringOptions = document.getElementById("recurringOptions");
+            var isRecurringChecked = document.getElementById("isRecurring").checked;
+            if (isRecurringChecked) {   //顯示 #recurringOptions
+                recurringOptions.style.maxHeight = "500px"; //設定最大高度
+                recurringOptions.style.visibility = "visible";
+                recurringOptions.style.opacity = "1";   //讓元素顯示
+            } else {    //隱藏 #recurringOptions
+                recurringOptions.style.maxHeight = "0"; //隱藏元素
+                recurringOptions.style.visibility = "hidden";
+                recurringOptions.style.opacity = "0";   //讓元素隱藏
+            }
+        }
+
+        document.getElementById('accountForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const priceInput = document.getElementById('price');
+            let price = parseFloat(priceInput.value);
+            const time = document.getElementById('time').value;
+            const type = document.getElementById('type').value; //支出or收入
+            const remark = document.getElementById('remark').value; //備註
+            const attach = document.getElementById('attach').files[0];  //獲取選擇的檔案
+            const isRecurring = document.getElementById('isRecurring').checked; //是否重複
+            const recurrenceType = document.getElementById('recurrenceType').value; //重複的週期
+            const recurrenceEndDate = document.getElementById('recurrenceEndDate').value;   //重複的截止日期
+
+            if (selectedType === 'expense') {
+                price = price > 0 ? -price : price; //若為正數則轉為負數
+            }
+            else if (selectedType === 'income') {
+                price = price < 0 ? -price : price;
+            }
+
+            const data = {
+                category: selectedCategoryInput.value,  //將選擇的類別添加到資料庫中
+                price: price,
+                time: time,
+                type: selectedType,
+                remark: remark,
+                isRecurring: isRecurring,
+                recurrenceType: recurrenceType,
+                recurrenceEndDate: recurrenceEndDate
+            };
+
+            // 將檔案轉換為 Blob 並附加到數據中
+            const formData = new FormData();
+            formData.append('data', JSON.stringify(data));  //將數據轉換為 JSON 字符串
+            formData.append('attach', attach);  //添加附件到表單數據
+
+            fetch('Account/addAccount', {
+                method: 'POST',
+                body: formData,
+            })
+                .then(response => response.json())
+                .then(data => {
+                    alert('帳目修改成功');
+                    window.location.href = 'view.html';
+                })
+                .catch((error) => {
+                    console.error('錯誤:', error);
+                    alert('修改帳目時發生錯誤');
+                });
+        });
+
+        function getIcon(category) {
+            switch (category) {
+                case '餐飲':
+                    return 'cup-fill';
+                case '服裝':
+                    return 'shop';
+                case '交通':
+                    return 'car-front-fill';
+                case '娛樂':
+                    return 'controller';
+                case '教育':
+                    return 'mortarboard-fill';
+                case '運動':
+                    return 'bicycle';
+                case '生活':
+                    return 'receipt';
+                case '美容':
+                    return 'scissors';
+                case '房租':
+                    return 'house-check-fill';
+                case '稅':
+                    return 'file-earmark-text';
+                case '保險':
+                    return 'sheild-fill-check';
+                case '醫療':
+                    return 'hospital';
+                case '水電費':
+                    return 'plug-fill'
+                case '通訊':
+                    return 'telephone';
+                case '其他(-)':
+                    return 'sign-intersection-fill';
+                case '薪水':
+                    return 'briefcase-fill';
+                case '投資':
+                    return 'graph-up-arrow';
+                case '兼職':
+                    return 'clock-fill';
+                case '其他(+)':
+                    return 'sign-intersection';
+                default:
+                    return 'question-circle'; // 默認圖標
+            }
+        }
+    </script>
+</body>
+
+</html>
