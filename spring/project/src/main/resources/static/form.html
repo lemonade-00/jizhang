@@ -266,16 +266,19 @@
         let selectedType = 'expense';   //預設為支出
         //選擇類別的函數
         function selectCategory(category, iconClass) {
+            selectedIconDiv.innerHTML = `<i class="bi ${iconClass}"></i>`;  //更新顯示的圖標
+            selectedCategoryInput.value = category;
+            selectedType = event.currentTarget.getAttribute('data-type');
+            //console.log(selectedType);
             if (category === '自定義') {
                 //顯示自定義類別的輸入框
                 document.getElementById('customCategoryInput').style.display = 'block';
                 isCustomCategory = true;
                 return; //不更新icon，讓使用者輸入自定義類別名稱
+            } else {
+                document.getElementById('customCategoryInput').style.display = 'none';
+                isCustomCategory = false;
             }
-
-            selectedIconDiv.innerHTML = `<i class="bi ${iconClass}"></i>`;  //更新顯示的圖標
-            selectedCategoryInput.value = category;
-            selectedType = event.currentTarget.getAttribute('data-type');
             modal.style.display = 'none'; // 自動關閉視窗
         }
 
@@ -337,9 +340,13 @@
                 recurrenceEndDate = '9999-12-31';
             }
             function formatToDateTimeLocal(date) {
-                const year = date.getFullYear();
-                const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份需要補零
-                const day = String(date.getDate()).padStart(2, '0'); // 天需要補零
+                const taiwanTime = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+
+                const year = taiwanTime.getFullYear();
+                const month = String(taiwanTime.getMonth() + 1).padStart(2, '0'); // 月份需要補零
+                const day = String(taiwanTime.getDate()).padStart(2, '0'); // 天需要補零
+                const hours = String(taiwanTime.getHours()).padStart(2, '0');
+                const minutes = String(taiwanTime.getMinutes()).padStart(2, '0');
 
                 return `${year}-${month}-${day}T${hours}:${minutes}`;
             }

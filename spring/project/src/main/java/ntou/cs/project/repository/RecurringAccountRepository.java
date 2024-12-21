@@ -14,4 +14,7 @@ public interface RecurringAccountRepository extends MongoRepository<RecurringAcc
 
     @Query("{ 'isActive': ?0 }")
     ArrayList<RecurringAccount> findByIsRecurring(boolean isActive);
+
+    @Query("{ 'ID': ?0 }")
+    RecurringAccount getAccountByID(String id);
 }

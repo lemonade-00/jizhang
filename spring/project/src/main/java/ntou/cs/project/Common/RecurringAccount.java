@@ -16,7 +16,7 @@ import java.time.LocalDate;
 public class RecurringAccount extends Account {
 
     public RecurringAccount(Account acc) {
-        super(acc.getID(), acc.getRemark(), acc.getCategory(), acc.getAttach(), acc.getAttachURL(), acc.getAccType(),
+        super(acc.getRemark(), acc.getCategory(), acc.getAttach(), acc.getAttachURL(), acc.getAccType(),
                 acc.getPrice(),
                 acc.getUserID(),
                 acc.getTime());

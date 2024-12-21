@@ -50,7 +50,6 @@ public class AccountsController {
 		String girdAttach = null;
 		if (attach != null && !attach.isEmpty()) {
 			girdAttach = myService.saveAttach(attach);
-			System.out.println(girdAttach);
 		}
 
 		Account accounts = myService.createAccount(request, girdAttach, userId);
@@ -63,8 +62,24 @@ public class AccountsController {
 		return ResponseEntity.created(location).body(accounts);
 	}
 
+	@PostMapping(value = "/budget")
+	public ResponseEntity<?> saveBudget(@RequestBody BudgetRequest breq) throws Exception {
+
+		String userId = getUserID();
+		try {
+			myService.saveBudget(breq, userId);
+			return ResponseEntity.ok().build();
+		} catch (Exception ex) {
+			System.out.println(ex);
+			return ResponseEntity.badRequest()
+					.body(Map.of(
+							"status", false,
+							"message", ex.getMessage()));
+		}
+	}
+
 	@DeleteMapping(value = "/{id}") // 刪除帳目
-	public ResponseEntity<Account> deleteAccount(@PathVariable("id") String id) {
+	public ResponseEntity<?> deleteAccount(@PathVariable("id") String id) {
 		myService.deleteAccount(id);
 		return ResponseEntity.noContent().build();
 	}
@@ -88,6 +103,24 @@ public class AccountsController {
 	public ResponseEntity<?> getAccount(@PathVariable("id") String id) {
 		Account item = myService.getAccount(id);
 		return ResponseEntity.ok(item);
+	}
+
+	@GetMapping(value = "/budget") // 取得預算
+	public ResponseEntity<?> getBudget() {
+		try {
+			String userId = getUserID();
+			Budget budget = myService.getBudgets(userId);
+			if (budget == null) {
+				return ResponseEntity.noContent().build();
+			}
+			return ResponseEntity.ok(budget);
+		} catch (Exception ex) {
+			System.out.println(ex);
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+					.body(Map.of(
+							"status", false,
+							"message", ex.getMessage()));
+		}
 	}
 
 	@GetMapping("/getAttach/{id}")
@@ -129,6 +162,7 @@ public class AccountsController {
 	private String getUserID() throws Exception {
 		try {
 			Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+			System.out.println(authentication);
 			User userDetails = (User) authentication.getPrincipal();
 			String userId = userDetails.getID();
 

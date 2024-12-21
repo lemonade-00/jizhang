@@ -30,6 +30,9 @@ public class MyService {
 	private RecurringAccountRepository recurrRepository;
 
 	@Autowired
+	private BudgetRepository budgetRepository;
+
+	@Autowired
 	private GridFsTemplate gridFsTemplate;
 
 	public String saveAttach(MultipartFile attach) {
@@ -54,11 +57,6 @@ public class MyService {
 		DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 		accounts.setTime(LocalDateTime.parse(request.getTime(), formatter));
 
-		if (attach != null) {
-			accounts.setAttachURL("/getAttach/" + attach);
-		}
-
-		repository.insert(accounts);
 		if (request.getisRecurring() == true) {
 			RecurringAccount ra = new RecurringAccount(accounts);
 			ra.setActive(true);
@@ -67,14 +65,38 @@ public class MyService {
 			ra.setLastGenerate(LocalDate.parse(request.getTime().split("T")[0], dateFormatter));
 			ra.setRecurrenceEndDate(LocalDate.parse(request.getRecurrenceEndDate(), dateFormatter));
 			recurrRepository.insert(ra);
+
+			accounts.setRecurrID(ra.getID());
 		}
+		repository.insert(accounts);
 
 		return accounts;
 	}
 
+	public void saveBudget(BudgetRequest req, String userID) {
+		Budget budget = budgetRepository.findByUserId(userID);
+		if (budget == null) {
+			budget = new Budget();
+		}
+		budget.setUserID(userID);
+		budget.setBudget(req.getBudget());
+		DateTimeFormatter dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE;
+		budget.setStartDate(LocalDate.parse(req.getStartDate(), dateFormatter));
+		budget.setEndDate(LocalDate.parse(req.getEndDate(), dateFormatter));
+		budgetRepository.save(budget);
+	}
+
 	public void deleteAccount(String id) {
+		Account account = repository.getAccountByID(id);
+		if (account.getAttach() != null) {
+			deleteAttach(account.getAttach());
+		}
 		repository.deleteById(id);
-		recurrRepository.deleteById(id);
+	}
+
+	private void deleteAttach(String attachId) {
+		gridFsTemplate.delete(new org.springframework.data.mongodb.core.query.Query(
+				org.springframework.data.mongodb.core.query.Criteria.where("_id").is(attachId)));
 	}
 
 	public ArrayList<?> getAccounts(QueryParameter param, String userID) {
@@ -97,18 +119,33 @@ public class MyService {
 		List<AccountWithResponse> response = accounts.stream()
 				.map(account -> new AccountWithResponse(
 						account,
-						recurringMap.get(account.getID())))
+						recurringMap.get(account.getRecurrID())))
 				.collect(Collectors.toList());
 		return new ArrayList<>(response);
 		// return new ArrayList<>(repository.getAllAccountsByUserId(userID, sort));
 	}
 
-	public Account getAccount(String id) { // 回傳單筆帳目
+	public Budget getBudgets(String userID) {
+		Budget budget = budgetRepository.findByUserId(userID);
+		LocalDate today = LocalDate.now();
+		if (budget != null && budget.getEndDate().isBefore(today)) {
+			budgetRepository.delete(budget);
+		}
+
+		return budget;
+	}
+
+	public Account getAccount(String id) {
 		return repository.getAccountByID(id);
+	}
+
+	public RecurringAccount getRecurrAccount(String id) {
+		return recurrRepository.getAccountByID(id);
 	}
 
 	public Account updateAccount(String id, AccountRequest request, MultipartFile attach) throws IOException {
 		Account oldAccount = getAccount(id);
+		RecurringAccount recurr = getRecurrAccount(oldAccount.getRecurrID());
 
 		oldAccount.setCategory(request.getCategory());
 		oldAccount.setAccType(request.getAccType());
@@ -118,17 +155,35 @@ public class MyService {
 		LocalDateTime time = LocalDateTime.parse(request.getTime(), formatter);
 		oldAccount.setTime(LocalDateTime.parse(time.toString()));
 
-		if (attach != null && !attach.isEmpty()) {
+		if (attach == null) {
+
+			if (oldAccount.getAttach() != null && !oldAccount.getAttach().equals(request.getAttach())) {
+				deleteAttach(oldAccount.getAttach());
+				oldAccount.setAttach(null);
+			}
+		} else {
 			String girdAttach = saveAttach(attach);
 			oldAccount.setAttach(girdAttach);
-			oldAccount.setAttachURL("/getAttach/" + girdAttach);
+		}
+		if (!request.getisRecurring() && recurr != null) {
+			recurrRepository.deleteById(recurr.getID());
+		} else if (request.getisRecurring()) {
+			RecurringAccount ra = new RecurringAccount(oldAccount);
+			if (recurr != null) {
+				ra.setID(recurr.getID());
+			}
+			ra.setActive(true);
+			ra.setRecurrenceType(request.getrecurrenceType());
+			DateTimeFormatter dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE;
+			ra.setLastGenerate(LocalDate.parse(request.getTime().split("T")[0], dateFormatter));
+			ra.setRecurrenceEndDate(LocalDate.parse(request.getRecurrenceEndDate(), dateFormatter));
+			recurrRepository.save(ra);
 		}
 
-		// 資料庫儲存變更
 		return repository.save(oldAccount);
 	}
 
-	@Scheduled(cron = "0 0 0 * * ?")
+	@Scheduled(cron = "0 59 22 * * ?")
 	public void handleRecurringAccounts() {
 		ArrayList<RecurringAccount> recurringAccounts = recurrRepository.findByIsRecurring(true);
 
@@ -143,6 +198,8 @@ public class MyService {
 				newAccount.setAttachURL(account.getAttachURL());
 				newAccount.setPrice(account.getPrice());
 				newAccount.setTime(LocalDateTime.now());
+				newAccount.setRecurrID(account.getID());
+				account.setLastGenerate(LocalDate.now());
 
 				repository.save(newAccount);
 			}
@@ -159,13 +216,13 @@ public class MyService {
 		}
 
 		switch (account.getRecurrenceType()) {
-			case "DAILY":
+			case "daily":
 				return true;
-			case "WEEKLY":
+			case "weekly":
 				return startDate.getDayOfWeek() == today.getDayOfWeek();
-			case "MONTHLY":
+			case "monthly":
 				return startDate.getDayOfMonth() == today.getDayOfMonth();
-			case "YEARLY":
+			case "yearly":
 				return startDate.getMonth() == today.getMonth() && startDate.getDayOfMonth() == today.getDayOfMonth();
 			default:
 				return false;

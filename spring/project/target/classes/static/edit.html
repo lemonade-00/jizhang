@@ -114,9 +114,7 @@
         }
 
         #submit {
-            width: 100%;
-            padding: 10px;
-            font-size: 16px;
+            grid-template-columns: repeat(2, 1fr);
         }
     }
 </style>
@@ -259,6 +257,8 @@
                 <div id="attachmentContainer"></div>
             </div>
             <button type="submit" class="btn" style="background-color: #493628; color: white;" id="submit">修改</button>
+            <button type="button" class="btn" style="background-color: #493628; color: white;" id="delete"
+                onclick="deleteAttach()">刪除附件</button>
         </form>
     </div>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
@@ -266,6 +266,8 @@
         const modal = document.getElementById('categoryModal');
         const selectedIconDiv = document.getElementById('selectedIcon');
         const selectedCategoryInput = document.getElementById('selectedCategory');
+        let isDelete = 0;
+        let selectedType;
 
         window.onload = function () {
             fetchSingleData();    //初始載入所有數據
@@ -275,69 +277,7 @@
             const selectedAccount = JSON.parse(sessionStorage.getItem('selectedAccount'));
             //console.log(selectedAccount);
             updateDisplay(selectedAccount); // 顯示篩選出的資料
-            /*const id = 8;
-            if (!id) {
-                alert('無效的 ID');
-                return;
-            }
-            fetch(`https://raw.githubusercontent.com/YRaynott/Software-Engineering/main/test.json`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`API 請求失敗，錯誤代碼: ${response.status}`);
-                    }
-                    return response.json(); // 將 JSON 響應解析為 JavaScript 數據
-                })
-                .then(data => {
-                    // 根據 id 篩選資料
-                    const record = data.find(item => String(item.account.id) === String(id));
-                    if (!record) {
-                        alert('未找到對應的資料');
-                        return;
-                    }
-                    const accountData = { ...record.account };  // 複製 account 資料
-                    if (record.recurringAccount) {
-                        accountData.active = record.recurringAccount.active;
-                        accountData.recurrenceType = record.recurringAccount.recurrenceType;
-                        accountData.recurrenceEndDate = record.recurringAccount.recurrenceEndDate;
-                    }
-                    updateDisplay(accountData); // 顯示篩選出的資料
-                    //console.log(accountData);
-                })
-                .catch(error => {
-                    console.error('錯誤:', error);
-                    alert('獲取數據時發生錯誤');
-                });*/
         }
-        /*function fetchSingleData() {
-            const queryString = window.location.search;
-            const urlParams = new URLSearchParams(queryString); //創建URLSearchParams物件
-            const id = urlParams.get('id'); //取得參數 id 的值
-            console.log(id);
-            if (!id) {
-                alert('無效的 ID');
-                return;
-            }
-            //發送請求，攜帶id
-            fetch(`/Account/${id}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`API 請求失敗，錯誤代碼: ${response.status}`);
-                    }
-                    return response.json(); // 解析 JSON 響應
-                })
-                .then(data => {
-                    if (!data) {
-                        alert('未找到資料');
-                        return;
-                    }
-                    // 顯示篩選出的資料
-                    updateDisplay(data);
-                })
-                .catch(error => {
-                    console.error('錯誤:', error);
-                    alert('獲取數據時發生錯誤');
-                });
-        }*/
 
         function updateDisplay(data) {
             //將獲取到的單筆資料顯示到頁面上
@@ -350,7 +290,7 @@
             const iconClass = getIcon(category);  // 獲取對應的圖標
             const selectedIconDiv = document.getElementById('selectedIcon');
             selectedIconDiv.innerHTML = `<i class="bi bi-${iconClass}"></i>`; // 更新圖標
-            const selectedType = data.type
+            selectedType = data.accType
             document.getElementById('selectedCategory').value = category;   // 將類別填入隱藏的 input 元素中
 
             //重複性處理
@@ -360,35 +300,46 @@
                 document.getElementById('recurrenceType').value = data.recurrenceType;
                 document.getElementById('recurrenceEndDate').value = data.recurrenceEndDate;
             }
+
             //附件處理
             if (data.attach) {
-
-                const attach = data.attach;
-                const attachURL = data.attachURL;
-                const fileExtension = attach.split('.').pop().toLowerCase();  // 取得檔案副檔名
-                const container = document.getElementById("attachmentContainer");
-
-                if (fileExtension === "jpg" || fileExtension === "jpeg" || fileExtension === "png" || fileExtension === "gif") {
-                    // 顯示圖片
-                    const img = document.createElement("img");
-                    img.src = attachURL;
-                    img.alt = attach;
-                    img.style.maxWidth = "100%";
-                    container.appendChild(img);
-                } else if (fileExtension === "mp4" || fileExtension === "avi" || fileExtension === "mov") {
-                    // 顯示影片
-                    const video = document.createElement("video");
-                    video.controls = true;
-                    const source = document.createElement("source");
-                    source.src = attachURL;
-                    source.type = "video/mp4";  // 根據實際格式設置type
-                    video.appendChild(source);
-                    container.appendChild(video);
-                }
-                const fileNameElement = document.createElement("div");
-                fileNameElement.textContent = attach;
-                container.appendChild(fileNameElement);
+                getAttach(data);
             }
+
+        }
+
+        //附件處理
+        function getAttach(data) {
+            fetch(`/Account/getAttach/${data.attach}`, { method: 'GET' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`API 請求失敗，錯誤代碼: ${response.status}`);
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    const contentType = blob.type;
+                    const container = document.getElementById('attachmentContainer');
+                    container.innerHTML = '';
+                    if (contentType.startsWith('image/')) {
+                        const img = document.createElement("img");
+                        img.src = URL.createObjectURL(blob);
+                        img.alt = 'Attachment Image';
+                        img.style.maxWidth = '80%';
+                        container.appendChild(img);
+                    }
+                    else if (contentType.startsWith('video/')) {
+                        const video = document.createElement("video");
+                        video.src = URL.createObjectURL(blob);
+                        video.controls = true;
+                        video.style.maxWidth = '80%';
+                        container.appendChild(video);
+
+                    }
+                })
+                .catch(error => {
+                    console.error("附件獲取失敗:", error);
+                });
         }
 
         //顯示選擇類別的視窗
@@ -448,14 +399,19 @@
             }
         }
 
+        function deleteAttach() {
+            isDelete = 1;
+            const container = document.getElementById('attachmentContainer');
+            container.innerHTML = '';
+        };
+
         document.getElementById('accountForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const priceInput = document.getElementById('price');
             let price = parseFloat(priceInput.value);
             const time = document.getElementById('time').value;
-            const type = document.getElementById('type').value; //支出or收入
             const remark = document.getElementById('remark').value; //備註
-            const attach = document.getElementById('attach').files[0];  //獲取選擇的檔案
+            let attach = document.getElementById('attach').files[0];  //獲取選擇的檔案
             const isRecurring = document.getElementById('isRecurring').checked; //是否重複
             const recurrenceType = document.getElementById('recurrenceType').value; //重複的週期
             const recurrenceEndDate = document.getElementById('recurrenceEndDate').value;   //重複的截止日期
@@ -466,25 +422,44 @@
             else if (selectedType === 'income') {
                 price = price < 0 ? -price : price;
             }
+            //console.log(attach);
+            const selectedAccount = JSON.parse(sessionStorage.getItem('selectedAccount'));
+            const accountId = selectedAccount ? selectedAccount.id : null;
+            console.log(selectedType)
 
-            const data = {
-                category: selectedCategoryInput.value,  //將選擇的類別添加到資料庫中
-                price: price,
-                time: time,
-                type: selectedType,
-                remark: remark,
-                isRecurring: isRecurring,
-                recurrenceType: recurrenceType,
-                recurrenceEndDate: recurrenceEndDate
-            };
-
-            // 將檔案轉換為 Blob 並附加到數據中
             const formData = new FormData();
-            formData.append('data', JSON.stringify(data));  //將數據轉換為 JSON 字符串
-            formData.append('attach', attach);  //添加附件到表單數據
+            if (!isDelete && !attach) {   //沒按刪除且也沒加附件
+                attach = selectedAccount.attach;
+                const data = {
+                    category: selectedCategoryInput.value,  //將選擇的類別添加到資料庫中
+                    price: price,
+                    time: time,
+                    accType: selectedType,
+                    remark: remark,
+                    attach: attach,
+                    isRecurring: isRecurring,
+                    recurrenceType: recurrenceType,
+                    recurrenceEndDate: recurrenceEndDate
+                };
+                formData.append('data', JSON.stringify(data));
+            } else {
+                const data = {
+                    category: selectedCategoryInput.value,  //將選擇的類別添加到資料庫中
+                    price: price,
+                    time: time,
+                    accType: selectedType,
+                    remark: remark,
+                    isRecurring: isRecurring,
+                    recurrenceType: recurrenceType,
+                    recurrenceEndDate: recurrenceEndDate
+                };
 
-            fetch('Account/addAccount', {
-                method: 'POST',
+                formData.append('data', JSON.stringify(data));  //將數據轉換為 JSON 字符串
+                formData.append('attach', attach);  //添加附件到表單數據
+            }
+
+            fetch(`/Account/${accountId}`, {
+                method: 'PATCH',
                 body: formData,
             })
                 .then(response => response.json())
@@ -539,7 +514,7 @@
                 case '其他(+)':
                     return 'sign-intersection';
                 default:
-                    return 'question-circle'; // 默認圖標
+                    return 'pencil-square'; // 默認圖標
             }
         }
     </script>

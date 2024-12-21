@@ -40,7 +40,7 @@ public class MailService {
 
         helper.setTo(to);
         helper.setSubject("一次性驗證碼");
-        helper.setText("<p>您的驗證碼為：<b>" + code + "</b></p>", true);
+        helper.setText("<p>您的驗證碼為：<b>" + code + "</b></p><br>有效期限10分鐘", true);
 
         mailSender.send(mimeMessage);
     }

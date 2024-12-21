@@ -14,6 +14,11 @@
         .button-grid {
             grid-template-columns: repeat(3, 1fr);
         }
+
+        .col-12.col-md-3 {
+            margin-bottom: 10px;
+            /* 增加底部間距 */
+        }
     }
 
     body {
@@ -21,9 +26,58 @@
         font-family: Arial, sans-serif;
     }
 
+    .modal {
+        display: none;
+        /* 隱藏視窗 */
+        position: fixed;
+        z-index: 1;
+        width: 100%;
+        height: 100%;
+        background-color: #493628;
+        /* 背景陰影 */
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-content {
+        background-color: #E4E0E1;
+        padding: 2%;
+        border-radius: 5px;
+        overflow-y: auto;
+        /* 允許垂直滾動 */
+        width: 80%;
+    }
+
+    input[type="number"],
+    input[type="date"],
+    input[type="datetime-local"] {
+        font-size: 14px;
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #493628;
+        border-radius: 5px;
+    }
+
+    .btn {
+        background-color: #493628;
+        color: #E4E0E1;
+        padding: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        margin-right: 10px;
+    }
+
+    .btn:hover {
+        background-color: #9e7e66;
+    }
+
     .budget-bar {
         background-color: #D6C0B3;
         border: 2px solid #493628;
+    }
+
+    .budget-main {
         padding: 10px;
         text-align: center;
         margin-bottom: 20px;
@@ -98,10 +152,48 @@
         <div class="row">
             <div class="col-md-8">
                 <div class="budget-bar" id="budgetBar">
-                    本月預算: <span class="budget-value" id="budgetDisplay">未設定</span>
-                    <div class="progress mt-2">
-                        <div id="budgetProgressBar" class="progress-bar" role="progressbar" style="width: 0;"></div>
-                    </div>剩餘預算: <span class="budget-value" id="remainingDisplay">未設定</span>
+                    <div class="budget-main">
+                        預算: <span class="budget-value" id="budgetDisplay">未設定</span>
+                        <div class="progress mt-2">
+                            <div id="budgetProgressBar" class="progress-bar" role="progressbar" style="width: 0;"></div>
+                        </div>剩餘預算: <span class="budget-value" id="remainingDisplay">未設定</span>
+                    </div>
+                    <div id="budgetRangeDisplay" style="margin-left: 20px; margin-bottom: 5px; text-align:left;"></div>
+                </div>
+                <!-- 新增預算設置視窗 -->
+                <div id="budgetModal" class="modal" onclick="closeBudgetModal(event)" style="display: none;">
+                    <div class="modal-content" onclick="event.stopPropagation()">
+                        <h2 style="font-weight: bold;">設定預算</h2>
+                        <div class="row">
+                            <div class="col-12 col-md-3">
+                                <label for="budgetAmount">預算金額:</label>
+                                <input type="number" id="budgetAmount" class="form-control" placeholder="請輸入預算金額"
+                                    required>
+                            </div>
+                            <div class="col-12 col-md-3">
+                                <label for="dateRangeSelect">選擇日期範圍:</label>
+                                <select id="dateRangeSelect" class="form-control" onchange="updateDateRange()">
+                                    <option value="thisMonth">本月</option>
+                                    <option value="thisYear">今年</option>
+                                    <option value="custom">自定義範圍</option>
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-3" id="startDateField" style="display: none;">
+                                <label for="startDate">起始日期:</label>
+                                <input type="date" id="startDate" class="form-control" required>
+                            </div>
+                            <div class="col-12 col-md-3" id="endDateField" style="display: none;">
+                                <label for="endDate">結束日期:</label>
+                                <input type="date" id="endDate" class="form-control" required>
+                            </div>
+                        </div>
+                        <div class="row-md-4">
+                            <button type="submit" class="btn" style="background-color: #493628; color: white;"
+                                onclick="saveBudget()">儲存</button>
+                            <button type="button" class="btn" style="background-color: #493628; color: white;"
+                                onclick="closeBudgetModal()">取消</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -132,14 +224,10 @@
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <script>
-        let budget = null;  //初始化預算
-
         //在網頁加載時獲取帳戶的所有帳目
         window.onload = function () {
-            //localStorage.removeItem('budget');
             fetchData();    //初始載入所有數據
             loadBudget();   //載入已儲存的預算
-            updateBudgetDisplay(); // 更新預算顯示
         };
 
         //獲取資料的函數
@@ -147,6 +235,54 @@
             fetch(`https://raw.githubusercontent.com/YRaynott/Software-Engineering/main/test.json`) // 替換為你的 API 端點
                 .then(response => response.json())
                 .then(data => {
+                    const allData = []; //假設每個帳目包含'account'和'recurringAccount'
+                    let i = 0;
+                    data.forEach(item => {  //如果有'account'和'recurringAccount'，將它們合併到allData
+                        if (item.account) {
+                            const accountData = { ...item.account };  // 直接push'account'內的資料
+                            if (item.recurringAccount) {
+                                accountData.active = item.recurringAccount.active;
+                                accountData.recurrenceType = item.recurringAccount.recurrenceType;
+                                accountData.recurrenceEndDate = item.recurringAccount.recurrenceEndDate;
+                            }
+                            allData.push(accountData);
+                        }
+                    });
+                    console.log(allData);
+                    updateDisplay(allData);
+                })
+                .catch(error => {
+                    console.error('錯誤:', error);
+                    alert('獲取數據時發生錯誤');
+                });
+        }*/
+
+        function fetchData() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('請重新登入');
+                window.location.href = 'index.html';
+            }
+            fetch('/Account', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 401) {
+                            window.location.href = 'index.html';
+                            throw new Error('請重新登入');
+                        } else {
+                            throw new Error(`${response.status}`);
+                        }
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(data);
                     const allData = []; //假設每個帳目包含'account'和'recurringAccount'
                     data.forEach(item => {  //如果有'account'和'recurringAccount'，將它們合併到allData
                         if (item.account) {
@@ -162,52 +298,8 @@
                     updateDisplay(allData);
                 })
                 .catch(error => {
-                    console.error('錯誤:', error);
-                    alert('獲取數據時發生錯誤');
-                });
-        }*/
-
-        function fetchData() {
-            // 假設 token 儲存在 localStorage 或 sessionStorage 中
-            const token = localStorage.getItem('token'); // 或者用 sessionStorage.getItem('token');
-            if (!token) {   // 檢查是否有 token
-                alert('沒有找到有效的身份驗證 token');
-                return;
-            }
-
-            // 發送請求，攜帶 token 作為 Authorization 標頭
-            fetch('/Account', {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json', // 設置請求的內容類型
-                    'Authorization': `Bearer ${token}`  // 攜帶 token
-                }
-            })
-                .then(response => {
-                    if (!response.ok) { // 檢查響應是否成功
-                        throw new Error(`API 請求失敗，錯誤代碼: ${response.status}`);
-                    }
-                    return response.json(); // 解析返回的 JSON
-                })
-                .then(data => {
-                    console.log(data)
-                    const allData = [];
-                    data.forEach(item => {  //如果有'account'和'recurringAccount'，將它們合併到allData
-                        if (item.account) {
-                            const accountData = { ...item.account };  // 直接push'account'內的資料
-                            if (item.recurringAccount) {
-                                accountData.active = item.recurringAccount.active;
-                                accountData.recurrenceType = item.recurringAccount.recurrenceType;
-                                accountData.recurrenceEndDate = item.recurringAccount.recurrenceEndDate;
-                            }
-                            allData.push(accountData);
-                        }
-                    });
-                    updateDisplay(allData);    // 更新顯示的資料
-                })
-                .catch(error => {
-                    console.error('錯誤:', error);
-                    alert('獲取數據時發生錯誤');
+                    console.error(error);
+                    alert(error.message);
                 });
         }
 
@@ -217,7 +309,9 @@
 
             entries.forEach(entry => {
                 const date = new Date(entry.time);
-                const dateKey = date.toISOString().split('T')[0];  // yyyy-mm-dd 格式
+                const taiwanOffset = 8 * 60;  // 台灣時間 UTC+8
+                const localTime = new Date(date.getTime() + taiwanOffset * 60 * 1000);  // 轉換為台灣時間
+                const dateKey = localTime.toISOString().split('T')[0];  // yyyy-mm-dd 格式
 
                 if (!groups[dateKey]) {
                     groups[dateKey] = [];
@@ -241,8 +335,9 @@
             const dataTable = document.getElementById('dataTable').querySelector('tbody');
 
             const now = new Date();
-            const currentMonth = now.getMonth();    //當前月份 (0-11)
-            const currentYear = now.getFullYear();  //當前年份
+            const taiwanTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Taipei" }));
+            const currentMonth = taiwanTime.getMonth();    //當前月份 (0-11)
+            const currentYear = taiwanTime.getFullYear();  //當前年份
 
             //篩選當前月份的支出和收入
             const currentExpenses = data.filter(item => {
@@ -261,9 +356,6 @@
             expenseDisplay.innerText = `支出: $${totalExpenses}`;
             incomeDisplay.innerText = `收入: $${totalIncome}`;
             moneyDisplay.innerText = `當前月份結餘: $${totalIncome - totalExpenses}`;
-
-            //更新預算顯示
-            updateBudgetDisplay(totalExpenses);
 
             dataTable.innerHTML = '';  // 清空表格
 
@@ -294,7 +386,7 @@
                 let totalExpenseContent = totalExpense > 0 ? `總支出: $${totalExpense}` : '';
                 let totalIncomeContent = totalIncome > 0 ? `總收入: $${totalIncome}` : '';
 
-                dateRow.innerHTML = `<td style="width: 50%; background-color: #AB886D" class="text-start"><strong>${group.date}</strong></td>
+                dateRow.innerHTML = `<td style="width: 50%; background-color: #AB886D" class="date-column text-start"><strong>${group.date}</strong></td>
                                     <td style="background-color: #AB886D; text-align: center;">重複性</td>
                                     <td class="text-end" style="width: 50%; background-color: #AB886D">${totalExpenseContent} ${totalIncomeContent}</td>
                                     <td style="background-color: #AB886D"></td>`;
@@ -327,7 +419,7 @@
                 document.querySelectorAll('.clickable-row').forEach(row => {
                     row.addEventListener('click', function () {
                         const id = this.dataset.id;
-                        const selectedAccount = data.find(account => Number(account.id) === Number(id));
+                        const selectedAccount = data.find(account => account.id === id);
                         sessionStorage.setItem('selectedAccount', JSON.stringify(selectedAccount));
                         window.location.href = `edit.html?id=${id}`;
                     });
@@ -362,6 +454,7 @@
                     }
                     alert('資料已成功刪除');
                     fetchData();    //刷新資料
+                    loadBudget();
                 })
                 .catch(error => {
                     console.error('錯誤:', error);
@@ -371,62 +464,223 @@
 
         //載入預算
         function loadBudget() {
-            const storedBudget = localStorage.getItem('budget');
-            if (storedBudget !== null) {
-                budget = parseFloat(storedBudget);  //轉換為數字並賦值給預算
-            } else {
-                budget = null;
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('請重新登入');
+                window.location.href = 'index.html';
             }
+            fetch('/Account/budget', {
+                method: 'GET',  // 使用 GET 方法來獲取預算'
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+                .then(response => {
+                    if (response.status === 204) {
+                        console.log('沒有設定預算');
+                        return null;
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data) {
+                        budget = parseFloat(data.budget);  // 將資料庫中的預算賦值給變數
+                        const budgetStart = data.startDate;
+                        const budgetEnd = data.endDate;
+                        console.log(`已載入預算: $${budget}，適用於 ${budgetStart}~${budgetEnd}`);
+                        // 更新顯示預算
+                        updateBudgetDisplay(budget, budgetStart, budgetEnd);
+                    } else {
+                        budget = null;  // 如果沒有預算則設為 null
+                        console.log('沒有設定預算');
+                    }
+                })
+                .catch(error => {
+                    console.error('錯誤:', error);
+                    alert('載入預算時發生錯誤');
+                });
         }
 
-        function updateBudgetDisplay(totalExpenses = 0) {
+        function updateBudgetDisplay(budget, startDate, endDate) {
             const budgetDisplay = document.getElementById('budgetDisplay');
             const remainingDisplay = document.getElementById('remainingDisplay');
             const budgetProgressBar = document.getElementById('budgetProgressBar');
-
-            if (budget === null) {
-                budgetDisplay.innerText = '未設定';
-                remainingDisplay.innerText = '未設定';
-                budgetProgressBar.style.width = '0%';
-                budgetProgressBar.style.backgroundColor = '#E4E0E1'; // 預算未設定的顏色
-            } else {
-                const remaining = budget - totalExpenses; // 餘額
-                budgetDisplay.innerText = `$${budget}`; // 顯示設定的預算
-                remainingDisplay.innerText = `$${remaining < 0 ? 0 : remaining}`; // 顯示剩餘預算
-
-                // 計算預算條的長度
-                let usedPercentage = (totalExpenses / budget) * 100;
-
-                // 確保不會超過100%
-                usedPercentage = Math.min(usedPercentage, 100);
-
-                // 設定進度條的寬度和顏色
-                budgetProgressBar.style.width = `${usedPercentage}%`;
-
-                // 根據剩餘預算改變顏色
-                if (totalExpenses === 0) {
-                    budgetProgressBar.style.backgroundColor = '#28a745'; // 沒有支出時顏色為綠色
+            startDate = new Date(startDate);
+            endDate = new Date(endDate);
+            let totalExpenses = 0;
+            const dataTable = document.getElementById('dataTable');
+            setTimeout(() => {
+                const tbody = document.querySelector('tbody');
+                const rows = tbody.querySelectorAll('tr');
+                //console.log('Row count:', rows.length);
+                rows.forEach(row => {
+                    // 擷取日期和價格欄位
+                    const dateCell = row.querySelector('.date-column');
+                    const priceCell = row.querySelector('.text-end');
+                    if (dateCell && priceCell) {
+                        const transactionDate = new Date(dateCell.innerText);
+                        const priceText = priceCell.innerText.trim();
+                        const match = priceText.match(/總支出:\s?\$?(\d+(\.\d+)?)/);  //只找「總支出」後的數字部分
+                        if (match) {
+                            const price = parseFloat(match[1]);  //提取數字並轉為浮動數字
+                            //檢查日期是否在範圍內
+                            if (transactionDate >= startDate && transactionDate <= endDate) {
+                                totalExpenses += price;  //累加支出金額
+                            }
+                        }
+                    }
+                });
+                //console.log(totalExpenses);
+                if (budget === null) {
+                    budgetDisplay.innerText = '未設定';
+                    remainingDisplay.innerText = '未設定';
+                    budgetProgressBar.style.width = '0%';
+                    budgetProgressBar.style.backgroundColor = '#E4E0E1'; // 預算未設定的顏色
                 } else {
-                    budgetProgressBar.style.backgroundColor = remaining > 0 ? '#28a745' : '#dc3545'; // 根據餘額顏色變化
+                    const remaining = budget - totalExpenses; // 餘額
+                    budgetDisplay.innerText = `$${budget}`; // 顯示設定的預算
+                    remainingDisplay.innerText = `$${remaining < 0 ? 0 : remaining}`; // 顯示剩餘預算
+                    // 計算預算條的長度
+                    let usedPercentage = (totalExpenses / budget) * 100;
+                    // 確保不會超過100%
+                    usedPercentage = Math.min(usedPercentage, 100);
+                    // 設定進度條的寬度和顏色
+                    budgetProgressBar.style.width = `${usedPercentage}%`;
+                    // 根據剩餘預算改變顏色
+                    if (totalExpenses === 0) {
+                        budgetProgressBar.style.backgroundColor = '#28a745'; // 沒有支出時顏色為綠色
+                    } else {
+                        budgetProgressBar.style.backgroundColor = remaining > 0 ? '#28a745' : '#dc3545'; // 根據餘額顏色變化
+                    }
                 }
+            }, 100);
+            // 顯示預算範圍
+            budgetRangeDisplay.innerText = `預算範圍：${startDate.toLocaleDateString('zh-TW')}~${endDate.toLocaleDateString('zh-TW')}`;
+        }
+
+        function updateBudgetInDatabase(newBudget, start, end) {
+
+            const token = localStorage.getItem('token');
+            if (!token) {
+                alert('請重新登入');
+                window.location.href = 'index.html';
+            }
+            fetch('/Account/budget', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ budget: newBudget, startDate: start, endDate: end }),  //傳送預算數值
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('儲存預算失敗');
+                    }
+                    console.log('預算已成功儲存');
+                })
+                .catch(error => {
+                    console.error('錯誤:', error);
+                    alert('儲存預算時發生錯誤');
+                });
+        }
+
+        // 顯示預算設置視窗
+        document.getElementById('budgetBar').addEventListener('click', function () {
+            const modal = document.getElementById('budgetModal');
+            modal.style.display = 'flex';
+            const today = new Date();
+            const todayString = today.toLocaleDateString('zh-TW').replace(/\//g, '-');  //使用'zh-TW'，並將/改為-
+            const startDateInput = document.getElementById('startDate');
+            startDateInput.setAttribute('max', todayString);    //限制日期選擇不可晚於今天
+            const endDateInput = document.getElementById('endDate');
+            endDateInput.setAttribute('min', todayString);
+            const dateRangeSelect = document.getElementById('dateRangeSelect');
+            dateRangeSelect.value = 'thisMonth';    //預設為本月
+            updateDateRange();  //自動設置起始和結束日期
+        });
+
+        function updateDateRange() {
+            var dateRangeSelect = document.getElementById('dateRangeSelect').value;
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+            var startDateField = document.getElementById('startDateField');
+            var endDateField = document.getElementById('endDateField');
+            const today = new Date();
+
+            let startDate, endDate;
+
+            // 顯示或隱藏起始和結束日期欄位
+            if (dateRangeSelect === 'custom') {
+                // 顯示日期選擇欄位
+                startDateField.style.display = 'block';
+                endDateField.style.display = 'block';
+            } else {
+                // 隱藏日期選擇欄位
+                startDateField.style.display = 'none';
+                endDateField.style.display = 'none';
+            }
+            switch (dateRangeSelect) {
+                case 'thisMonth':
+                    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+                    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+                    startDate = formatDate(firstDayOfMonth);
+                    endDate = formatDate(lastDayOfMonth);
+                    break;
+                case 'thisYear':
+                    const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+                    const lastDayOfYear = new Date(today.getFullYear(), 11, 31);
+                    startDate = formatDate(firstDayOfYear);
+                    endDate = formatDate(lastDayOfYear);
+                    break;
+                case 'custom':  //自定義範圍
+                    //當選擇自定義範圍時，保持當前選擇的日期值
+                    startDate = startDateInput.value || today.toLocaleDateString('zh-TW').replace(/\//g, '-');
+                    endDate = endDateInput.value || today.toLocaleDateString('zh-TW').replace(/\//g, '-');
+                    break;
+            }
+            //設起始和結束日期
+            startDateInput.value = startDate;
+            endDateInput.value = endDate;
+        }
+
+        //格式化日期為 YYYY-MM-DD
+        function formatDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        //關閉設定預算視窗
+        function closeBudgetModal(event) {
+            if (event && event.target === document.getElementById('budgetModal')) {
+                document.getElementById('budgetModal').style.display = 'none';
             }
         }
 
-        //點擊預算條設定預算
-        document.getElementById('budgetBar').addEventListener('click', function () {
-            const userInput = prompt("請設定您的預算:", budget !== null ? budget : "");
-            if (userInput !== null) {
-                const newBudget = parseFloat(userInput);
-                if (!isNaN(newBudget) && newBudget >= 0) {
-                    budget = newBudget; //設定新的預算
-                    const totalExpenses = Number(expenseDisplay.innerText.replace(/[^0-9]/g, ''));  //提取當前支出
-                    localStorage.setItem('budget', newBudget);  //載入先前的預算(如果有的話)
-                    updateBudgetDisplay(totalExpenses); //更新顯示
-                } else {
-                    alert("請輸入有效的預算數字！");
-                }
+        function saveBudget() {
+            //儲存預算的功能
+            const budgetAmount = document.getElementById('budgetAmount').value;
+            if (!budgetAmount) {
+                alert("預算金額為必填！");
+                document.getElementById('budgetAmount').focus(); // 將焦點移到預算金額欄位
+                return false; // 阻止後續執行
             }
-        });
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+            //在這裡可以將預算金額和日期進行保存或處理
+            console.log(`預算金額: ${budgetAmount}, 起始日期: ${startDate}, 結束日期: ${endDate}`);
+            updateBudgetInDatabase(budgetAmount, startDate, endDate);
+            updateBudgetDisplay(budgetAmount, startDate, endDate);
+            //關閉預算視窗
+            closeBudgetModal();
+        }
+
+        function closeBudgetModal() {
+            document.getElementById('budgetModal').style.display = 'none';
+        }
 
         //根據類別回傳對應的Bootstrap icon名稱
         function getIcon(category) {
@@ -470,7 +724,7 @@
                 case '其他(+)':
                     return 'sign-intersection';
                 default:
-                    return 'question-circle'; // 默認圖標
+                    return 'pencil-square'; // 默認圖標
             }
         }
 
@@ -478,6 +732,54 @@
         document.getElementById('addAccountButton').addEventListener('click', function () {
             window.location.href = 'form.html';
         });
+
+        document.getElementById('showChartButton').addEventListener('click', function () {
+            window.location.href = 'pie.html';
+        });
+
+        document.getElementById('exportButton').addEventListener('click', function () {
+            // 取得所有帶有 data-id 的行
+            const rows = document.querySelectorAll('.clickable-row');
+            const data = [];
+            const seenIds = new Set();  // 用來儲存已經處理過的 ID，避免重複
+
+            rows.forEach(row => {
+                // 取得類別（文字內容）
+                const category = row.textContent.trim();
+
+                // 取得價格（從相同的行中查找價格）
+                const priceCell = row.closest('tr').querySelectorAll('td')[1];
+                const priceText = priceCell.textContent.trim();
+                const price = parseFloat(priceText.replace('$', ''));
+
+                // 確認 data-id 屬性
+                const id = row.getAttribute('data-id');
+
+                // 如果這個 ID 還沒被處理過，就加入資料
+                if (!seenIds.has(id)) {
+                    seenIds.add(id);  // 標記這個 ID 已經處理過
+                    data.push({ id, category, price });
+                }
+            });
+
+            // 將資料轉換為 CSV 格式
+            const csvContent = [
+                // 加入 CSV 標題行
+                ['ID', '類別', '價格'],
+                ...data.map(row => [row.id, row.category, row.price])
+            ]
+                .map(row => row.join(','))
+                .join('\n');
+
+            // 在 CSV 開頭加入 BOM 以確保 Excel 正確識別 UTF-8 編碼
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'example.csv';
+            link.click();
+        });
+
+
     </script>
 </body>
 
